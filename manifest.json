@@ -1,0 +1,10 @@
+{
+  "name": "Neon Notes",
+  "short_name": "NeonNotes",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#000000",
+  "theme_color": "#000000",
+  "orientation": "portrait",
+  "icons": []
+}

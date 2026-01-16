@@ -1,0 +1,556 @@
+/* Cyberpunk Neon Theme */
+/* Import Nightgazer12 font */
+@font-face {
+  font-family: 'Nightgazer12';
+  src: url('./Nightgazer12.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+}
+
+:root {
+  --bg-color: #050505;
+  --neon-red: #ff003c;
+  --neon-dim: #5c0016;
+  --grid-color: #1a1a1a;
+  --text-main: #ff003c;
+  --text-light: #ffffff;
+  --glass: rgba(20, 20, 20, 0.8);
+  --title-font-size: 1.2rem;
+}
+
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+
+body, html {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  background-color: var(--bg-color);
+  font-family: 'Nightgazer12', monospace;
+  color: var(--text-main);
+  overflow: hidden; /* App handles scrolling */
+}
+
+#root {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background-image: 
+    linear-gradient(var(--grid-color) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-color) 1px, transparent 1px);
+  background-size: 20px 20px;
+}
+
+/* === Main Container === */
+.app-container {
+  width: 100%;
+  max-width: 750px;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  padding: 20px;
+  gap: 20px;
+  position: relative;
+  margin: 0 auto;
+}
+
+/* === Header === */
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 8px;
+  border-bottom: 2px solid var(--neon-red);
+  box-shadow: 0 4px 10px -2px rgba(255, 0, 60, 0.3);
+}
+
+.title {
+  font-size: 1.2rem;
+  letter-spacing: 2px;
+  text-shadow: 0 0 5px var(--neon-red);
+  margin: 0;
+}
+
+.status-indicator {
+  font-size: 0.7rem;
+  color: var(--text-light);
+  background: var(--neon-red);
+  padding: 2px 6px;
+  border-radius: 2px;
+}
+
+/* === Canvas Area === */
+.canvas-wrapper {
+  width: 100%;
+  position: relative;
+  border: 1px solid var(--neon-red);
+  box-shadow: 0 0 15px rgba(255, 0, 60, 0.2);
+  background: #ffffff; /* Explicitly white as per drawing requirements usually needing contrast */
+  aspect-ratio: 4 / 3;
+}
+
+canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: none; /* Critical for custom drag handling */
+  image-rendering: pixelated;
+}
+
+/* === Controls === */
+.controls-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  overflow-y: auto;
+  padding: 10px;
+  background: rgba(20, 20, 20, 0.8);
+  border-radius: 4px;
+  border: 1px solid var(--neon-red);
+}
+
+.input-group {
+  display: flex;
+  gap: 8px;
+}
+
+input[type="text"] {
+  flex: 1;
+  background: rgba(0,0,0,0.7);
+  border: 1px solid var(--neon-red);
+  color: var(--text-light);
+  font-family: inherit;
+  padding: 10px;
+  font-size: 1rem;
+  outline: none;
+  box-shadow: inset 0 0 5px rgba(255, 0, 60, 0.2);
+  user-select: text;
+}
+
+input[type="text"]:focus {
+  background: rgba(20, 0, 5, 0.9);
+  box-shadow: inset 0 0 8px rgba(255, 0, 60, 0.5);
+}
+
+/* === Button Grid === */
+.button-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+button {
+  background: transparent;
+  border: 1px solid var(--neon-red);
+  color: var(--neon-red);
+  font-family: inherit;
+  padding: 14px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  transition: all 0.1s ease;
+  position: relative;
+  overflow: hidden;
+  border-radius: 4px;
+}
+
+button:active {
+  transform: translateY(2px);
+}
+
+button:hover {
+  background: rgba(255, 0, 60, 0.1);
+  box-shadow: 0 0 8px var(--neon-red);
+  color: #fff;
+}
+
+button.active {
+  background: var(--neon-red);
+  color: #000;
+  font-weight: bold;
+  box-shadow: 0 0 15px var(--neon-red);
+}
+
+button.danger {
+  border-color: #ff0000;
+  color: #ff0000;
+}
+button.danger:hover {
+  background: #ff0000;
+  color: black;
+}
+
+/* === Color Picker === */
+.color-selector {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--neon-red);
+  border-radius: 4px;
+}
+
+.color-btn {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: transform 0.2s;
+  position: relative;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
+}
+
+.color-btn.selected {
+  transform: scale(1.1);
+  border-color: var(--text-light);
+  box-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+}
+
+.color-btn.btn-red { background: #FF0000; box-shadow: 0 0 10px #FF0000; }
+.color-btn.btn-black { background: #000000; border: 1px solid #444; }
+.color-btn.btn-white { background: #FFFFFF; border: 1px solid #ccc; box-shadow: 0 0 10px #FFFFFF; }
+
+/* === Instructions === */
+.instructions {
+  font-size: 0.7rem;
+  color: #666;
+  text-align: center;
+  margin-top: auto;
+  border-top: 1px dashed #333;
+  padding-top: 8px;
+}
+
+/* Animations */
+@keyframes flicker {
+  0%, 19%, 21%, 23%, 25%, 54%, 56%, 100% {
+    opacity: 1;
+  }
+  20%, 24%, 55% {
+    opacity: 0.5;
+  }
+}
+
+/* Drawer styles */
+.drawer-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.8);
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    z-index: 1000;
+}
+
+.drawer-content {
+    background: var(--bg-color);
+    border-left: 2px solid var(--neon-red);
+    box-shadow: -5px 0 20px rgba(255, 0, 60, 0.3);
+    width: 100%;
+    max-width: 750px;
+    max-height: 90vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.drawer-header {
+    padding: 20px;
+    border-bottom: 1px solid var(--neon-red);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.drawer-header h2 {
+    margin: 0;
+    font-size: 1.5rem;
+    color: var(--neon-red);
+    text-shadow: 0 0 5px var(--neon-red);
+}
+
+.drawer-header .close-button {
+    background: transparent;
+    border: none;
+    color: var(--neon-red);
+    font-size: 1.5rem;
+    cursor: pointer;
+    padding: 0;
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.drawer-header .close-button:hover {
+    color: #fff;
+    text-shadow: 0 0 10px var(--neon-red);
+}
+
+.drawer-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px;
+    padding-right: 30px;
+}
+
+/* Custom scrollbar for drawer */
+.drawer-body::-webkit-scrollbar {
+    width: 8px;
+}
+
+.drawer-body::-webkit-scrollbar-track {
+    background: rgba(20, 20, 20, 0.5);
+    border-radius: 4px;
+}
+
+.drawer-body::-webkit-scrollbar-thumb {
+    background: var(--neon-red);
+    border-radius: 4px;
+}
+
+.drawer-body::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 0, 60, 0.8);
+}
+
+.flicker-text {
+  animation: flicker 4s infinite;
+}
+
+/* === Bluetooth Integration Styles === */
+
+/* Flex containers */
+.flex-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.flex-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.flex-group.right {
+  margin-left: auto;
+}
+
+/* Fieldsets */
+fieldset {
+  border: none;
+  box-shadow: 0 .5rem 0.5rem rgba(255, 0, 60, 0.3);
+  background: rgba(20, 20, 20, 0.8);
+  padding: 10px;
+  margin-bottom: 16px;
+  border-radius: 4px;
+  border: 1px solid var(--neon-red);
+}
+
+fieldset legend {
+  font-weight: bold;
+  color: var(--neon-red);
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+/* Log container */
+.log-container {
+  width: 100%;
+  min-height: 100px;
+  max-height: 300px;
+  margin: 0;
+  padding: 5px;
+  background: rgba(20, 20, 20, 0.9);
+  overflow-y: auto;
+  overflow-x: hidden;
+  font-family: ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas, Liberation Mono, monospace;
+  box-sizing: border-box;
+  word-break: break-word;
+  border: 1px solid var(--neon-dim);
+  color: var(--text-light);
+}
+
+.log-container .log-line {
+  padding: 2px 0;
+}
+
+.log-container .time,
+.log-container .action {
+  display: inline-block;
+  white-space: nowrap;
+}
+
+.log-container .time {
+  color: #888;
+  margin-right: 0.5em;
+}
+
+.log-container .action {
+  color: var(--neon-red);
+  margin-right: 0.5em;
+}
+
+/* Canvas container */
+.canvas-container canvas {
+  border: 1px solid var(--neon-red);
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: 0 auto;
+  background: white;
+  box-shadow: 0 0 15px rgba(255, 0, 60, 0.2);
+}
+
+.canvas-container.crop-mode canvas {
+  border: 2px dashed var(--neon-red);
+  cursor: grab;
+}
+
+/* Status bar */
+.status-bar {
+  display: block;
+  font-size: 85%;
+  color: #888;
+  margin-bottom: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px dotted var(--neon-dim);
+}
+
+/* Canvas tools */
+.canvas-title {
+  display: none;
+  text-align: center;
+  margin-bottom: 5px;
+  color: var(--neon-red);
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.canvas-tools {
+  margin-top: 10px;
+  justify-content: center;
+}
+
+.brush-tools,
+.text-tools,
+.crop-tools {
+  display: none;
+}
+
+.canvas-container.brush-mode .brush-tools,
+.canvas-container.text-mode .brush-tools,
+.canvas-container.eraser-mode .brush-tools,
+.canvas-container.text-mode .text-tools,
+.canvas-container.crop-mode .crop-tools {
+  display: flex;
+}
+
+.canvas-container.crop-mode .tool-buttons,
+.canvas-container.crop-mode .brush-tools,
+.canvas-container.crop-mode .text-tools {
+  display: none;
+}
+
+/* Tool buttons */
+.tool-button {
+  width: 36px;
+  height: 36px;
+  font-size: 1.2rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 5px;
+  background: transparent;
+  border: 1px solid var(--neon-red);
+  border-radius: 4px;
+  padding: 0;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  color: var(--neon-red);
+}
+
+.tool-button:hover {
+  background: rgba(255, 0, 60, 0.1);
+  box-shadow: 0 0 8px var(--neon-red);
+  color: #fff;
+}
+
+.tool-button.active {
+  background: var(--neon-red);
+  color: #000;
+  font-weight: bold;
+  box-shadow: 0 0 15px var(--neon-red);
+  border-color: var(--neon-red);
+}
+
+.tool-button.hide {
+  display: none;
+}
+
+/* Debug mode */
+.debug {
+  display: none !important;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .flex-container {
+    flex-direction: column;
+  }
+
+  .flex-container.options .flex-group label {
+    min-width: 80px;
+  }
+
+  .flex-group.right {
+    margin-left: 0;
+  }
+
+  .canvas-tools.flex-container {
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .canvas-tools .flex-group {
+    justify-content: center;
+    width: 100%;
+  }
+
+  .log-container {
+    height: 150px;
+    margin-top: 10px;
+  }
+
+  fieldset {
+    padding: 8px;
+  }
+
+  button {
+    width: auto;
+  }
+
+  input[type=text],
+  input[type=number],
+  select {
+    max-width: 100%;
+    margin-bottom: 5px;
+  }
+}
