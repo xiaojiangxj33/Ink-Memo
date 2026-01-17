@@ -957,7 +957,7 @@ function App() {
                             
                             {/* 右边：字体大小设置 */}
                             <div style={{ display: 'flex', alignItems: 'center', gap: '0px' }}>
-                                <label htmlFor="font-size" style={{ whiteSpace: 'nowrap', marginRight: '8px' }}>字体大小:</label>
+                                <label htmlFor="font-size" style={{ whiteSpace: 'nowrap', marginRight: '8px' }}>T:</label>
                                 <button
                                     onClick={() => {
                                         if (selectedId) {
@@ -1193,21 +1193,21 @@ function App() {
                                     className="primary" 
                                     onClick={() => handleSyncTime(1)}
                                 >
-                                    日历模式
+                                    日历
                                 </button>
                                 <button 
                                     type="button" 
                                     className="primary" 
                                     onClick={() => handleSyncTime(2)}
                                 >
-                                    时钟模式
+                                    时钟
                                 </button>
                                 <button 
                                     type="button" 
                                     className="secondary" 
                                     onClick={handleClearScreen}
                                 >
-                                    清除屏幕
+                                    清屏
                                 </button>
                             </div>
                             {bluetoothStatus.debug && (

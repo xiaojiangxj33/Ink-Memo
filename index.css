@@ -190,17 +190,17 @@ button.danger:hover {
 /* === Color Picker === */
 .color-selector {
   display: flex;
-  gap: 16px;
+  gap: 10px;
   justify-content: center;
-  padding: 12px;
+  padding: 8px;
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid var(--neon-red);
   border-radius: 4px;
 }
 
 .color-btn {
-  width: 50px;
-  height: 50px;
+  width: 33px;
+  height: 33px;
   border-radius: 50%;
   border: 2px solid transparent;
   cursor: pointer;
@@ -341,9 +341,18 @@ button.danger:hover {
 
 .flex-group {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 8px;
   align-items: center;
+  width: 100%;
+}
+
+.flex-group button {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .flex-group.right {
@@ -553,4 +562,9 @@ fieldset legend {
     max-width: 100%;
     margin-bottom: 5px;
   }
+
+/* Font size input specific styling for narrow screens */
+#font-size {
+  width: 40px !important;
+}
 }
