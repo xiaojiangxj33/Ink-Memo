@@ -59,6 +59,7 @@ export interface CanvasState {
   imageData: ImageData;
   textElements: TextElement[];
   lineSegments: LineSegment[];
+  drawProgress?: number;
 }
 
 // 文本元素

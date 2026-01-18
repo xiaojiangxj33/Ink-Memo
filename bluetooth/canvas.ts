@@ -993,7 +993,7 @@ export function updateImage(canvas: HTMLCanvasElement, file: File): Promise<void
     image.onload = function () {
       URL.revokeObjectURL(this.src);
       
-      const ctx = canvas.getContext('2d');
+      const ctx = canvas.getContext('2d', { willReadFrequently: true });
       if (!ctx) {
         reject(new Error('无法获取画布上下文'));
         return;
@@ -1034,7 +1034,7 @@ export function updateImage(canvas: HTMLCanvasElement, file: File): Promise<void
  * Fill canvas with specified color
  */
 export function fillCanvas(canvas: HTMLCanvasElement, style: string): void {
-  const ctx = canvas.getContext('2d');
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
   if (!ctx) return;
   
   ctx.fillStyle = style;
@@ -1125,7 +1125,7 @@ export function rotateCanvas(canvas: HTMLCanvasElement): void {
   const tempCanvas = document.createElement('canvas');
   tempCanvas.width = currentWidth;
   tempCanvas.height = currentHeight;
-  const tempCtx = tempCanvas.getContext('2d');
+  const tempCtx = tempCanvas.getContext('2d', { willReadFrequently: true });
   if (!tempCtx) return;
   
   tempCtx.putImageData(imageData, 0, 0);

@@ -69,7 +69,8 @@ function App() {
         dithering: 'floydSteinberg',
         contrast: 1.2,
         strength: 1.0,
-        colorPalette: 'blackWhiteColor'
+        colorPalette: 'blackWhiteColor',
+        drawProgress: 0
     });
 
     const [isDrawerOpen, setIsDrawerOpen] = useState(false);
@@ -110,7 +111,7 @@ function App() {
                 canvas.height = Math.floor(rect.height);
             }
             
-            const ctx = canvas.getContext('2d');
+            const ctx = canvas.getContext('2d', { willReadFrequently: true });
             if (ctx) {
                 paintManagerRef.current = new PaintManager(canvas, ctx);
                 cropManagerRef.current = new CropManager(canvas, ctx);
@@ -128,26 +129,75 @@ function App() {
         }));
     }, []);
 
-    // Set log callback for bluetooth module
+    // Set log and progress callbacks for bluetooth module
     useEffect(() => {
-        // Import setLogCallback dynamically to avoid circular dependencies
-        import('./bluetooth/bluetooth').then(({ setLogCallback }) => {
+        // Import setLogCallback and setProgressCallback dynamically to avoid circular dependencies
+        import('./bluetooth/bluetooth').then(({ setLogCallback, setProgressCallback }) => {
             setLogCallback(updateLog);
+            setProgressCallback((progress: number) => {
+                setCanvasState(prev => ({ ...prev, drawProgress: progress }));
+            });
         });
     }, [updateLog]);
 
+    // 蓝牙连接弹窗状态
+    const [showBluetoothModal, setShowBluetoothModal] = useState(false);
+    const [bluetoothSupport, setBluetoothSupport] = useState(true);
+    const [bluetoothDevices, setBluetoothDevices] = useState<Array<{name: string, id: string}>>([]);
+    const [isScanning, setIsScanning] = useState(false);
+    
     // Bluetooth control handlers
     const handlePreConnect = useCallback(async () => {
         try {
+            updateLog("点击了连接按钮，开始执行连接流程");
+            
+            // 详细检查浏览器支持情况
+            let supportStatus = true;
+            let supportDetails = [];
+            
+            if (typeof navigator === 'undefined') {
+                supportStatus = false;
+                supportDetails.push("navigator 对象未定义");
+            } else {
+                if (!navigator.bluetooth) {
+                    supportStatus = false;
+                    supportDetails.push("navigator.bluetooth 未定义");
+                    
+                    // 检查浏览器信息
+                    const userAgent = navigator.userAgent;
+                    supportDetails.push(`浏览器UA: ${userAgent}`);
+                    
+                    // 检查是否为HTTPS
+                    if (window.location.protocol !== 'https:') {
+                        supportDetails.push("当前协议: " + window.location.protocol + " (Web Bluetooth仅支持HTTPS)");
+                    }
+                }
+            }
+            
+            // 检查浏览器是否支持蓝牙
+            if (!supportStatus) {
+                updateLog("错误: 浏览器不支持蓝牙");
+                updateLog("支持详情: " + supportDetails.join(", "));
+                setBluetoothSupport(false);
+                setShowBluetoothModal(true);
+                return;
+            }
+            
+            // 显示自定义蓝牙连接弹窗
+            setShowBluetoothModal(true);
+            setIsScanning(true);
+            updateLog("准备调用 navigator.bluetooth.requestDevice()");
+            
+            // 调用浏览器原生蓝牙搜索
             await preConnect();
-            // 连接成功后更新状态
-            setBluetoothStatus(prev => ({
-                ...prev,
-                connected: true
-            }));
+            
+            setIsScanning(false);
+            setShowBluetoothModal(false);
+            updateLog("preConnect函数执行完成");
         } catch (error) {
-            updateLog(`连接失败: ${error instanceof Error ? error.message : '未知错误'}`);
-            // 连接失败后更新状态
+            updateLog(`连接流程出错: ${error instanceof Error ? error.message : '未知错误'}`);
+            setIsScanning(false);
+            setShowBluetoothModal(false);
             setBluetoothStatus(prev => ({
                 ...prev,
                 connected: false
@@ -173,10 +223,13 @@ function App() {
 
     const handleSendImage = useCallback(() => {
         if (bluetoothCanvasRef.current) {
-            sendimg(bluetoothCanvasRef.current, canvasState).then(() => {
-                updateLog('图片发送成功');
+            sendimg(bluetoothCanvasRef.current, canvasState).then(success => {
+                if (success) {
+                    updateLog('图片发送成功');
+                }
+                // 失败日志已经在sendimg内部记录，这里不再重复记录
             }).catch(error => {
-                updateLog(`图片发送失败: ${error.message}`);
+                updateLog(`图片发送异常: ${error.message}`);
             });
         }
     }, [canvasState, updateLog]);
@@ -211,7 +264,7 @@ function App() {
             updateImage(bluetoothCanvasRef.current, event.target.files[0]).then(() => {
                 updateLog('图片更新成功');
                 // 保存原始图像数据，用于后续抖动处理
-                const ctx = bluetoothCanvasRef.current.getContext('2d');
+                const ctx = bluetoothCanvasRef.current.getContext('2d', { willReadFrequently: true });
                 if (ctx) {
                     originalImageRef.current = ctx.getImageData(0, 0, bluetoothCanvasRef.current.width, bluetoothCanvasRef.current.height);
                     // 图片加载完成后，立即应用当前的canvasState设置
@@ -231,7 +284,7 @@ function App() {
     // Automatically apply dither when canvas state changes
     useEffect(() => {
         if (bluetoothCanvasRef.current && originalImageRef.current) {
-            const ctx = bluetoothCanvasRef.current.getContext('2d');
+            const ctx = bluetoothCanvasRef.current.getContext('2d', { willReadFrequently: true });
             if (ctx) {
                 // 先恢复原始图像
                 ctx.putImageData(originalImageRef.current, 0, 0);
@@ -376,7 +429,7 @@ function App() {
     // Drawing Loop
     const draw = useCallback(() => {
         const canvas = canvasRef.current;
-        const ctx = canvas?.getContext('2d');
+        const ctx = canvas?.getContext('2d', { willReadFrequently: true });
         if (!canvas || !ctx) return;
 
         // 使用canvas实际尺寸
@@ -556,7 +609,7 @@ function App() {
 
         const canvas = canvasRef.current;
         if (!canvas) return;
-        const ctx = canvas.getContext('2d');
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
         if (!ctx) return;
 
         const pos = getCanvasPoint(e);
@@ -1103,6 +1156,199 @@ function App() {
                 </div>
             </div>
 
+            {/* Custom Bluetooth Connection Modal */}
+            {showBluetoothModal && (
+                <div style={{
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    background: 'rgba(0, 0, 0, 0.85)',
+                    display: 'flex',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    zIndex: 1000,
+                    fontFamily: 'Courier New, monospace',
+                    color: '#ffffff',
+                    overflow: 'auto'
+                }}>
+                    <div style={{
+                        background: 'rgba(20, 20, 20, 0.95)',
+                        border: '2px solid #FF0033',
+                        borderRadius: '8px',
+                        padding: '24px',
+                        width: '90%',
+                        maxWidth: '500px',
+                        boxShadow: '0 0 20px rgba(255, 0, 51, 0.5)'
+                    }}>
+                        <h2 style={{
+                            marginBottom: '20px',
+                            color: '#FF0033',
+                            fontSize: '1.5rem',
+                            textAlign: 'center',
+                            textShadow: '0 0 10px rgba(255, 0, 51, 0.8)'
+                        }}>蓝牙连接</h2>
+                        
+                        {!bluetoothSupport ? (
+                            <div style={{ textAlign: 'center' }}>
+                                <div style={{
+                                    fontSize: '2rem',
+                                    marginBottom: '16px',
+                                    color: '#FF0033'
+                                }}>❌</div>
+                                <p style={{ marginBottom: '16px' }}>您的浏览器不支持Web Bluetooth API</p>
+                                <p style={{ marginBottom: '20px', fontSize: '0.9rem', color: '#cccccc' }}>
+                                    建议使用以下浏览器：<br />
+                                    • 电脑: Chrome/Edge 80+<br />
+                                    • Android: Chrome/Edge 80+<br />
+                                    • iOS: Bluefy浏览器
+                                </p>
+                                
+                                {/* 针对Chrome浏览器的特殊提示 */}
+                                <div style={{
+                                    background: 'rgba(255, 0, 51, 0.1)',
+                                    border: '1px solid #FF0033',
+                                    borderRadius: '4px',
+                                    padding: '16px',
+                                    marginBottom: '20px',
+                                    textAlign: 'left'
+                                }}>
+                                    <h4 style={{ marginBottom: '12px', color: '#FF0033', textAlign: 'center' }}>Chrome浏览器用户注意</h4>
+                                    <ul style={{ margin: 0, paddingLeft: '20px', fontSize: '0.9rem' }}>
+                                        <li style={{ marginBottom: '8px' }}>确保您使用的是Chrome 80+版本</li>
+                                        <li style={{ marginBottom: '8px' }}>Web Bluetooth仅支持HTTPS连接</li>
+                                        <li style={{ marginBottom: '8px' }}>在本地开发时，可使用localhost或127.0.0.1</li>
+                                        <li style={{ marginBottom: '8px' }}>检查浏览器地址栏是否显示锁图标</li>
+                                        <li style={{ marginBottom: '8px' }}>尝试在浏览器中访问 chrome://flags/#enable-experimental-web-platform-features 并启用该选项</li>
+                                    </ul>
+                                </div>
+                                
+                                <button 
+                                    onClick={() => setShowBluetoothModal(false)}
+                                    style={{
+                                        background: '#FF0033',
+                                        color: 'white',
+                                        border: 'none',
+                                        padding: '10px 20px',
+                                        borderRadius: '4px',
+                                        cursor: 'pointer',
+                                        fontSize: '1rem',
+                                        fontFamily: 'Courier New, monospace',
+                                        boxShadow: '0 0 10px rgba(255, 0, 51, 0.5)'
+                                    }}
+                                >
+                                    关闭
+                                </button>
+                            </div>
+                        ) : (
+                            <div>
+                                <div style={{
+                                    marginBottom: '20px',
+                                    textAlign: 'center',
+                                    fontSize: '1.1rem'
+                                }}>
+                                    {isScanning ? (
+                                        <div>
+                                            <div style={{ fontSize: '2rem', marginBottom: '12px' }}>🔍</div>
+                                            <p>正在搜索蓝牙设备...</p>
+                                            <p style={{ fontSize: '0.9rem', color: '#cccccc', marginTop: '8px' }}>
+                                                请在浏览器弹窗中选择您的墨水屏设备
+                                            </p>
+                                        </div>
+                                    ) : (
+                                        <div>
+                                            <div style={{ fontSize: '2rem', marginBottom: '12px' }}>📱</div>
+                                            <p>请点击下方按钮开始搜索设备</p>
+                                        </div>
+                                    )}
+                                </div>
+                                
+                                <div style={{ marginBottom: '20px' }}>
+                                    {bluetoothDevices.length > 0 ? (
+                                        <div>
+                                            <h3 style={{ marginBottom: '12px', color: '#FF0033' }}>找到设备：</h3>
+                                            <div style={{
+                                                maxHeight: '200px',
+                                                overflowY: 'auto',
+                                                border: '1px solid #FF0033',
+                                                borderRadius: '4px',
+                                                padding: '8px'
+                                            }}>
+                                                {bluetoothDevices.map(device => (
+                                                    <div key={device.id} style={{
+                                                        padding: '12px',
+                                                        marginBottom: '8px',
+                                                        background: 'rgba(255, 0, 51, 0.1)',
+                                                        borderRadius: '4px',
+                                                        cursor: 'pointer',
+                                                        transition: 'all 0.3s ease'
+                                                    }}>
+                                                        {device.name || '未知设备'}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    ) : isScanning ? (
+                                        <div style={{ textAlign: 'center', color: '#cccccc' }}>
+                                            搜索中...
+                                        </div>
+                                    ) : null}
+                                </div>
+                                
+                                <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px' }}>
+                                    <button 
+                                        onClick={() => setShowBluetoothModal(false)}
+                                        style={{
+                                            flex: 1,
+                                            background: 'transparent',
+                                            color: '#ffffff',
+                                            border: '1px solid #FF0033',
+                                            padding: '10px',
+                                            borderRadius: '4px',
+                                            cursor: 'pointer',
+                                            fontSize: '1rem',
+                                            fontFamily: 'Courier New, monospace',
+                                            transition: 'all 0.3s ease'
+                                        }}
+                                    >
+                                        取消
+                                    </button>
+                                    <button 
+                                        onClick={() => {
+                                            setIsScanning(true);
+                                            preConnect().then(() => {
+                                                setIsScanning(false);
+                                                setShowBluetoothModal(false);
+                                            }).catch(() => {
+                                                setIsScanning(false);
+                                            });
+                                        }}
+                                        disabled={isScanning}
+                                        style={{
+                                            flex: 1,
+                                            background: '#FF0033',
+                                            color: 'white',
+                                            border: 'none',
+                                            padding: '10px',
+                                            borderRadius: '4px',
+                                            cursor: 'pointer',
+                                            fontSize: '1rem',
+                                            fontFamily: 'Courier New, monospace',
+                                            boxShadow: '0 0 10px rgba(255, 0, 51, 0.5)',
+                                            opacity: isScanning ? 0.6 : 1,
+                                            pointerEvents: isScanning ? 'none' : 'auto'
+                                        }}
+                                    >
+                                        {isScanning ? '搜索中...' : '重新搜索'}
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
+            
             {/* Bluetooth Control Panel Side Drawer */}
             <SideDrawer 
                 isOpen={isDrawerOpen} 
@@ -1116,6 +1362,7 @@ function App() {
                         <div className="flex-container">
                             <div className="flex-group">
                                 <button 
+                                    id="connectbutton"
                                     type="button" 
                                     className="primary" 
                                     onClick={handlePreConnect}
@@ -1123,6 +1370,7 @@ function App() {
                                     连接
                                 </button>
                                 <button 
+                                    id="reconnectbutton"
                                     type="button" 
                                     className="secondary" 
                                     onClick={() => {
@@ -1319,6 +1567,19 @@ function App() {
                                     position: 'relative'
                                 }}
                             />
+                        </div>
+                        
+                        {/* Progress Bar */}
+                        <div className="progress-container">
+                            <div className="progress-bar">
+                                <div 
+                                    className="progress-fill" 
+                                    style={{ width: `${canvasState.drawProgress || 0}%` }}
+                                ></div>
+                            </div>
+                            <div className="progress-text">
+                                绘制进度: {Math.round(canvasState.drawProgress || 0)}%
+                            </div>
                         </div>
                         
                         <div className="flex-container">

@@ -4,6 +4,7 @@
  */
 
 import { EpdCmd, BluetoothStatus, CanvasSize } from './types';
+import { processImageData } from './dithering';
 
 // 画布尺寸定义
 export const canvasSizes: CanvasSize[] = [
@@ -45,11 +46,22 @@ let textDecoder: TextDecoder | null = null;
 type LogCallback = (message: string, action?: string) => void;
 let logCallback: LogCallback | null = null;
 
+// 进度回调类型
+type ProgressCallback = (progress: number) => void;
+let progressCallback: ProgressCallback | null = null;
+
 /**
  * 设置日志回调
  */
 export function setLogCallback(callback: LogCallback): void {
   logCallback = callback;
+}
+
+/**
+ * 设置进度回调
+ */
+export function setProgressCallback(callback: ProgressCallback): void {
+  progressCallback = callback;
 }
 
 /**
@@ -124,7 +136,15 @@ export async function write(cmd: number, data?: string | Uint8Array | number[], 
     if (data instanceof Uint8Array) data = Array.from(data);
     payload.push(...data);
   }
-  addLog(bytes2hex(payload), '⇑');
+  
+  // 隐藏图片数据的详细日志，只记录命令类型
+  if (cmd === EpdCmd.WRITE_IMG) {
+    // 只记录写入图片数据的命令类型，不显示详细数据
+    addLog("发送图片数据块", '⇑');
+  } else {
+    // 其他命令正常记录
+    addLog(bytes2hex(payload), '⇑');
+  }
   
   try {
     if (withResponse) {
@@ -154,13 +174,29 @@ export async function write(cmd: number, data?: string | Uint8Array | number[], 
 export async function writeImage(data: Uint8Array, step: 'bw' | 'color' = 'bw'): Promise<void> {
   const chunkSize = parseInt(document.getElementById('mtusize')?.value || '20') - 2;
   const interleavedCount = parseInt(document.getElementById('interleavedcount')?.value || '50');
-  const count = Math.round(data.length / chunkSize);
+  const totalBytes = data.length;
+  const totalChunks = Math.ceil(totalBytes / chunkSize);
   let chunkIdx = 0;
   let noReplyCount = interleavedCount;
+  let bytesSent = 0;
 
   for (let i = 0; i < data.length; i += chunkSize) {
+    // 计算进度百分比
+    const currentChunkSize = Math.min(chunkSize, data.length - i);
+    bytesSent += currentChunkSize;
+    const progress = Math.round((bytesSent / totalBytes) * 100);
+    
+    // 显示友好的进度信息，使用进度条样式
+    const progressBar = '//////////'.substring(0, Math.round((progress / 10))) + '.........'.substring(0, 10 - Math.round((progress / 10)));
+    
     let currentTime = (new Date().getTime() - startTime) / 1000.0;
-    setStatus(`${step === 'bw' ? '黑白' : '颜色'}块: ${chunkIdx + 1}/${count + 1}, 总用时: ${currentTime}s`);
+    setStatus(`${step === 'bw' ? '黑白' : '颜色'}数据 | ${progressBar} ${progress}% | 总用时: ${currentTime.toFixed(1)}s`);
+    
+    // 调用进度回调
+    if (progressCallback) {
+      progressCallback(progress);
+    }
+    
     const payload = [
       (step === 'bw' ? 0x0F : 0x00) | (i === 0 ? 0x00 : 0xF0),
       ...data.slice(i, i + chunkSize),
@@ -308,28 +344,57 @@ export function convertUC8159(blackWhiteData: Uint8Array, redWhiteData: Uint8Arr
 /**
  * 发送图片
  */
-export async function sendimg(canvas: HTMLCanvasElement, canvasState: any): Promise<void> {
+export async function sendimg(canvas: HTMLCanvasElement, canvasState: any): Promise<boolean> {
   // 检查设备连接状态
   if (!gattServer || !gattServer.connected || !epdCharacteristic) {
     addLog("发送图片失败：设备未连接");
-    return;
+    // 重置进度
+    if (progressCallback) {
+      progressCallback(0);
+    }
+    return false;
+  }
+  
+  // 重置进度
+  if (progressCallback) {
+    progressCallback(0);
   }
   
   const ditherMode = canvasState.colorPalette;
+  const canvasSize = `${canvas.width}_${canvas.height}`;
+
+  // 模拟参考代码中的驱动选择
+  const epdDriverSelect = document.getElementById('epddriver') as HTMLSelectElement;
+  if (epdDriverSelect) {
+    const selectedOption = epdDriverSelect.options[epdDriverSelect.selectedIndex];
+    
+    // 检查画布尺寸和驱动是否匹配（如果有数据的话）
+    const driverCanvasSize = selectedOption.getAttribute('data-size');
+    const driverColorMode = selectedOption.getAttribute('data-color');
+    
+    if (driverCanvasSize && driverCanvasSize !== canvasSize) {
+      // 这里我们不弹出确认框，只记录日志
+      addLog("警告：画布尺寸和驱动可能不匹配");
+    }
+    if (driverColorMode && driverColorMode !== ditherMode) {
+      addLog("警告：颜色模式和驱动可能不匹配");
+    }
+  }
 
   startTime = new Date().getTime();
+  setStatus(`开始发送，颜色模式: ${ditherMode}`);
 
-  const ctx = canvas.getContext('2d');
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
   if (!ctx) {
     addLog("无法获取画布上下文");
-    return;
+    return false;
   }
 
   try {
     addLog(`开始发送图片，颜色模式: ${ditherMode}`);
     
     const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    // @ts-ignore - 暂时忽略类型错误，后续会实现processImageData函数
+    // @ts-ignore - 暂时忽略类型错误
     const processedData = processImageData(imageData, ditherMode);
 
     updateButtonStatus(true);
@@ -346,16 +411,30 @@ export async function sendimg(canvas: HTMLCanvasElement, canvasState: any): Prom
       const halfLength = Math.floor(processedData.length / 2);
       const blackWhiteData = processedData.slice(0, halfLength);
       const redWhiteData = processedData.slice(halfLength);
-      // 简化实现，只处理基本情况
-      await writeImage(blackWhiteData, 'bw');
-      await writeImage(redWhiteData, 'red');
+      
+      // 参考代码中的UC8159转换支持
+      if (epdDriverSelect && (epdDriverSelect.value === '08' || epdDriverSelect.value === '09')) {
+        addLog("使用UC8159格式发送图片");
+        await writeImage(convertUC8159(blackWhiteData, redWhiteData), 'bw');
+      } else {
+        await writeImage(blackWhiteData, 'bw');
+        await writeImage(redWhiteData, 'red');
+      }
     } else if (ditherMode === 'blackWhiteColor') {
       addLog("使用双色模式发送图片");
-      await writeImage(processedData, 'bw');
+      
+      // 参考代码中的UC8159转换支持
+      if (epdDriverSelect && (epdDriverSelect.value === '08' || epdDriverSelect.value === '09')) {
+        addLog("使用UC8159格式发送图片");
+        const emptyData = new Uint8Array(processedData.length).fill(0xFF);
+        await writeImage(convertUC8159(processedData, emptyData), 'bw');
+      } else {
+        await writeImage(processedData, 'bw');
+      }
     } else {
       addLog("当前固件不支持此颜色模式。");
       updateButtonStatus();
-      return;
+      return false;
     }
 
     if (!(await write(EpdCmd.REFRESH))) {
@@ -364,14 +443,25 @@ export async function sendimg(canvas: HTMLCanvasElement, canvasState: any): Prom
     
     updateButtonStatus();
 
+    // 设置进度为100%
+    if (progressCallback) {
+      progressCallback(100);
+    }
+
     const sendTime = (new Date().getTime() - startTime) / 1000.0;
     addLog(`发送完成！耗时: ${sendTime}s`);
     setStatus(`发送完成！耗时: ${sendTime}s`);
     addLog("屏幕刷新完成前请不要操作。");
+    return true;
   } catch (error) {
     console.error('发送图片失败:', error);
     addLog(`发送图片失败: ${error instanceof Error ? error.message : '未知错误'}`);
     updateButtonStatus();
+    // 重置进度为0%
+    if (progressCallback) {
+      progressCallback(0);
+    }
+    return false;
   }
 }
 
@@ -428,6 +518,10 @@ export function disconnect(): void {
  * 预连接处理
  */
 export async function preConnect(): Promise<void> {
+  addLog("preConnect 函数被调用");
+  addLog(`当前 gattServer 状态: ${gattServer ? (gattServer.connected ? '已连接' : '未连接') : 'null'}`);
+  addLog(`当前 bleDevice 状态: ${bleDevice ? '已存在' : 'null'}`);
+  
   if (gattServer != null && gattServer.connected) {
     addLog("设备已连接，开始断开连接");
     if (bleDevice != null && bleDevice.gatt?.connected) {
@@ -437,23 +531,28 @@ export async function preConnect(): Promise<void> {
   }
   else {
     addLog("开始连接设备...");
+    addLog("检查 navigator.bluetooth 是否可用: " + (navigator.bluetooth ? "是" : "否"));
+    
+    if (!navigator.bluetooth) {
+      addLog("错误: 浏览器不支持蓝牙");
+      return;
+    }
+    
     resetVariables();
     try {
+      addLog("准备调用 navigator.bluetooth.requestDevice()");
       bleDevice = await navigator.bluetooth.requestDevice({
         optionalServices: ['62750001-d828-918d-fb46-b6c11c675aec'],
         acceptAllDevices: true
       });
       addLog(`已选择设备: ${bleDevice.name || '未知设备'}`);
     } catch (e) {
-      console.error(e);
-      if (e instanceof Error && e.message) {
-        if (e.message.includes('canceled') || e.message.includes('Canceled')) {
-          addLog("连接已取消");
-        } else {
-          addLog(`requestDevice 失败: ${e.message}`);
-        }
+      console.error("requestDevice 异常:", e);
+      if (e instanceof Error) {
+        addLog(`requestDevice 失败: ${e.name}: ${e.message}`);
+        addLog(`错误堆栈: ${e.stack}`);
       } else {
-        addLog("requestDevice 失败: 未知错误");
+        addLog(`requestDevice 失败: 未知错误类型: ${JSON.stringify(e)}`);
       }
       addLog("请检查蓝牙是否已开启，且使用的浏览器支持蓝牙！建议使用以下浏览器：");
       addLog("• 电脑: Chrome/Edge");
